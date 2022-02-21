@@ -1,0 +1,12 @@
+---
+layout: archive
+title: ""
+permalink: /teaching/
+author_profile: true
+---
+
+## Teaching Assistant
+
+I am currently a teaching assistant for Professor Miller's [structural econometrics](https://comlabgames.com/structuraleconometrics/).
+
+- [GMM](/structural-econometrics/Hansen and Singleton, 1982 (GMM).ipynb)
