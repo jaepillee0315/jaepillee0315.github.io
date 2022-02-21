@@ -9,4 +9,4 @@ author_profile: true
 
 I am currently a teaching assistant for Professor Miller's [structural econometrics](https://comlabgames.com/structuraleconometrics/).
 
-- [GMM](/structural-econometrics/Hansen and Singleton, 1982 (GMM).ipynb)
+- [GMM](/structural-econometrics/1_OLS_LIV.html)
