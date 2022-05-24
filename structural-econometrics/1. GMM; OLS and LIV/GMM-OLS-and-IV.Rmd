@@ -1,8 +1,10 @@
 ---
 title: "GMM: OLS and IV"
 author: "Jaepil Lee"
-date: "`r Sys.Date()`"
-output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    html_document:
+      theme: cerulean
 ---
 
 The goal of this note is to show that OLS and IV are just an application of GMM.
