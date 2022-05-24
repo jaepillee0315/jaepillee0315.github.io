@@ -1,0 +1,1133 @@
+---
+title: "GMM: OLS and IV"
+author: "Jaepil Lee"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+The goal of this note is to show that OLS and IV are just an application of GMM.
+
+1. [GMM: Concept and Algorithm](#gmm-concept) <a id='gmm-concept-menu'></a>
+2. [Example 1: OLS](#gmm-ols) <a id='gmm-ols-menu'></a>
+3. [Example 2: LIV](#gmm-liv) <a id='gmm-liv-menu'></a>
+
+### Setup {.tabset .tabset-pills}
+
+#### R
+```{r, echo=T, message=FALSE, warning=FALSE, error=FALSE, results='hide'}
+# Setting for R
+options(rgl.debug = TRUE)
+package_list <- c("knitr", "tidyverse", "numDeriv", "matlib",
+                 "MASS", "matrixStats", "Matrix",
+                 "doParallel", "foreach",
+                 "microbenchmark", "reticulate", "JuliaCall")
+package_check <- function(package) {
+    if (!require(package, quietly = TRUE, character.only = TRUE)) {
+        install.packages(package, repos = "http://cran.us.r-project.org")
+        }
+}
+lapply(package_list, package_check)
+lapply(package_list, library, character.only = TRUE, quietly = TRUE)
+# Setting for R Markdown
+knitr::opts_chunk$set(echo = TRUE)
+# Setting for using Julia in R Markdown
+knit_engines$set(julia = JuliaCall::eng_juliacall)
+julia_command('Pkg; Pkg.activate("./")')
+# Setting for using Python in R Markdown
+use_virtualenv("./../.venv")
+```
+#### Julia
+```{julia, results='hide'}
+## In Julia, you can activate virtual environment you compiled in REPL
+# using Pkg; Pkg.activate("./..")
+## Importing packages...
+using CSV, Random, LinearAlgebra, Optim, ForwardDiff, DataFrames, Printf,
+    Distributions, Statistics, HypothesisTests, SharedArrays, TimeSeries
+```
+#### Python
+```{python, results='hide'}
+## Windows: in your terminal, type the following to activate your virtual environment with quotation marks:
+# ".venv/Scripts/activate"
+## If you want to deactivate the virtual environment, type: 
+# deactivate
+## If you want to install a package:
+# py -m pip install [package]
+## If you wnat to upgrade a package:
+# py -m pip install --upgrade [package]
+## Importing packages...
+import sys, os, datetime
+import matplotlib as mlt, matplotlib.pyplot as plt
+import autograd.numpy as np, scipy as sci, pandas as pd
+from autograd import grad, jacobian, hessian
+from autograd.scipy.stats import norm
+from scipy.optimize import minimize
+import statsmodels.api as sm
+import random
+from numpy.random import seed, rand, randn
+from numpy.linalg import inv
+```
+
+### [GMM: Concept and Algorithm](#gmm-concept-menu) <a id='gmm-concept'></a>
+Let's suppose we are given a model and iid data $\{(y_i,x_i)\}_{i=1}^{N}$. Let's also suppose that the model suggests that a function of orthogonality conditions $f_i(\beta):=f(Y_i,X_i,\beta)$ is sufficient to identify the parameters of the DGP:
+$$
+    \mathbb{E}\left(f_i(\beta)\right)=0.
+$$
+
+#### Definition ([Hansen, p.416](https://www.ssc.wisc.edu/~bhansen/econometrics/Econometrics.pdf))
+Let $\beta$ be a $k\times1$ vector, $f_i(\beta)$ be a $l\times1$ orthogonality conditions, and $W$ be a $l\times l$ positive definite weighting matrix. Define the GMM criterion function $J(\beta)$ as
+$$
+    J(\beta) = N \left(\frac{1}{N}\sum_{i=1}^N f_i(\beta)\right)' W \left(\frac{1}{N}\sum_{i=1}^N f_i(\beta)\right).
+$$
+The GMM estimator is 
+$$
+    \hat{\beta}_{gmm} = \underset{\beta}{\arg\min}\; J(\beta).
+$$
+
+#### Proposition ([Hansen, p.432](https://www.ssc.wisc.edu/~bhansen/econometrics/Econometrics.pdf))
+Under general regularity conditions, $\sqrt{N}(\hat{\beta}_{gmm}-\beta_0) \xrightarrow[]{d} N(0,V_\beta)$ where 
+$$
+\begin{align*}
+    V_\beta &= (Q'WQ)^{-1}(Q'W\Omega WQ)(Q'WQ)^{-1}\\
+    \Omega &= \mathbb{E}(f_i f_i') \\
+    Q &= \mathbb{E}\left[\frac{\partial}{\partial \beta'}f_i(\beta)\right].
+\end{align*}
+$$
+If $W$ is efficient, $V_\beta = (Q'\Omega^{-1} Q)^{-1}$.
+
+Note that when you compute standard errors for $\hat{\beta}_{gmm}$, **you must divide $V_\beta$ by $N$**. $V_\beta$ is the variance for $\sqrt{N}(\hat{\beta}_{gmm}-\beta)$, not $\hat{\beta}_{gmm}$ .
+
+#### Two-step GMM ([Bruce Hansen, p.444](https://www.ssc.wisc.edu/~bhansen/econometrics/Econometrics.pdf))
+In order to construct an efficient GMM estimator, we need to know what is the optimal $W$ in the criterion function. If the optimal weighting matrix $W=\Omega^{-1}$ is unknown, we can estimate $W$ with a GMM with any weighting matrix, say, $W=I$. Then, we can run the GMM routine again with $W=\hat{\Omega}^{-1}$ based on our first stage estimate $\beta_{gmm}$. This is called two-step GMM.
+
+One could also iterate updating the weighting matrix as many times as you wish until $\hat{\beta}_{gmm}$ converges. This is called an **Iterated GMM**. Note, however, two-step GMM is already asymptotically efficient. You might want to use iterated GMM if you think the estimates are suffering from having a small sample.
+
+#### Programming
+We can now program the GMM estimation routine:
+
+  1. Set some weighting matrix $W$.
+    - If the parameters are just-identified, simply use $W=I$.
+    - If you are using linear instrumental variable estimation and the parameters are over-identified, the use $W=(Z'Z)^{-1}$. Note that this is what we use in 2SLS and is optimal already.
+    - If you plan to use iterated GMM, set some tolerance to declare 'convergence'.
+  1. Construct the GMM criterion function. It is **obj_IV** in my code.
+  1. Ask the computer to minimize the criterion function for you. The minimizer is your $\hat{\beta}_{gmm}$.
+  1. Compute $Q$ and $\Omega$.
+    - If you are using a two-step GMM, then repeat step 3 and 4 by setting $W=\hat{\Omega}^{-1}$.
+  1. Compute the asymptotic variance $V_\beta$. 
+  1. Compute standard errors with $\textbf{sqrt}.(\textbf{diag}(\mathbf{V_\beta}/N))$
+
+### [Example 1: OLS](#gmm-ols) <a id='gmm-ols-menu'></a> {.tabset .tabset-pills}
+
+We will see how GMM works in an OLS setting. Let's construct a hypothetical data set:
+
+#### R
+```{r, echo=T, results='hide'}
+dgp_ols <- function(n, b, s) {
+    ## Input
+    # N: the number of observations
+    # b: parameters for the DGP
+    # s: std dev for the error term, "e"
+    set.seed(42) # a random number generator for replicability
+    x <- matrix(c(rep(1, n), rep(rnorm(n * (length(b) - 1)))), ncol = length(b))
+    e <- s * rnorm(n)
+    y <- x %*% b + e
+    df <- data.frame(x, y) # x1-x"length(b)-1"
+    return(df)
+}
+```
+
+#### Julia
+```{julia, echo=T, results='hide'}
+function DGP_ols(N,b,s)
+    ## Input
+    # N: the number of observations
+    # b: parameters for the DGP
+    # s: std dev for the error term, "e"
+    Random.seed!(42) # rng for replicability
+    X = [ones(N,1) randn(N,length(b)-1)]
+    e = s * randn(N)
+    y = X * b + e
+    df = [X y]
+    return df
+
+end
+```
+
+#### Python
+```{python, echo=T, results='hide'}
+def DGP_ols(N,b,s):
+    ## Input
+    # N: the number of observations
+    # b: DGP parameters
+    # s: std dev for the error term
+    np.random.seed(42) # a rng for replicability
+    X = np.c_[np.ones(N),randn(N,len(b)-1)]
+    e = s * randn(N)
+    y = X @ b + e
+    df = np.c_[X,y]
+    return df
+```
+### {-}
+
+#### Generate data {.tabset .tabset-pills}
+
+Below is how R, Julia, and Python would generate a dataset. For comparability, I will use the dataset R created.
+
+##### R
+```{r, echo=T, results='hide'}
+n <- 10000
+b_ols <- c(0.5, 1.2, 1.5, 1.25)
+s <- 1.5
+df_ols <- dgp_ols(n, b_ols, s)
+```
+
+##### Julia
+```{julia, echo=T, results='hide'}
+N = 10_000;
+b_ols = Array{Float64}([0.5, 1.2, 1.5, 1.25]);
+s = 1.5;
+df_ols = DGP_ols(N,b_ols,s);
+```
+
+##### Python
+```{python, echo=T, results='hide'}
+N = 10000
+b_ols = [0.5, 1.2, 1.5, 1.25]
+s = 1.5
+df_ols = DGP_ols(N,b_ols,s)
+```
+
+##### Data
+```{r, results='hide'}
+write.csv(df_ols, "./ols_dataset.csv", row.names = FALSE)
+```
+
+```{julia, results='hide'}
+df_ols = Matrix{Float64}(DataFrame(CSV.File("./ols_dataset.csv")));
+```
+
+```{python, results='hide'}
+df_ols = pd.read_csv("./ols_dataset.csv").to_numpy()
+```
+
+#### {-}
+
+The size of the data set is $N=$ `r sprintf("%.0f",n)`, the parameters of the DGP are $\beta=$ (`r b_ols`). The idiosyncratic error has a normal distributuion of mean 0 and standard deviation of `r s`, but we are not estimating this.
+$$
+    y_i = \beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \varepsilon_i,\quad \varepsilon_i \sim \mathcal{N}(0,\sigma^2) \text{ for }i=1,\ldots,N
+$$
+We all know what $\beta_{ols}$ looks like: $(X'X)^{-1}X'Y$ where $X$ is a $N\times$ `r length(b_ols)` matrix of $x_i$'s and $Y$ is a $N\times1$ vector of $y_i$'s. We also know the formula for covariance and thus the standard errors of the estimates. Let's code them just for fun:
+
+#### OLS Estimation by Formula {.tabset .tabset-pills}
+
+##### R
+```{r}
+ols_formula <- function(df) {
+    ## Input
+    # df[1]-df[end-1]: independent variables X
+    # df[end]: dependent variable y
+    ## Output
+    # b_ols: beta hat
+    # sigma_ols: std err of beta hat
+    x <- as.matrix(df[, seq_len(ncol(df) - 1)])
+    y <- df[, ncol(df)]
+    inv_xx <- matlib::inv(t(x) %*% x)
+    b_ols <- inv_xx %*% t(x) %*% y
+    e_ols <- y - x %*% b_ols
+    xe <- x * rep(e_ols, ncol(x))
+    # V_HC0 - White-Heteroskedasticity-Robust VCov
+    var_ols <- inv_xx %*% (t(xe) %*% xe) %*% inv_xx
+    sig_ols <- sqrt(diag(var_ols))
+    return(list("b_hat" = b_ols, "sigma_hat" = sig_ols))
+}
+```
+
+##### Julia
+```{julia}
+function ols_formula(df)
+    ## Input
+    # df[1]-df[end-1]: independent variables X
+    # df[end]: dependent variable y
+    ## Output
+    # b_ols: beta hat
+    # sigma_ols: std err of beta hat
+    X = df[:, 1:end-1]
+    y = df[:, end]
+    invXX = inv(X'X)
+    b_ols = invXX * X'y
+    e_ols = y - X * b_ols
+    Xe = @. X * e_ols # elt-wise mult
+    # V_HC0 - White-Heteroskedasticity-Robust VCov
+    var_ols = invXX * (Xe' * Xe) * invXX
+    sig_ols = sqrt.(diag(var_ols))
+    return [b_ols, sig_ols]
+end;
+```
+##### Python
+```{python}
+def ols_formula(df):
+    ## Input
+    # df[:,:-1]: independent variables X
+    # df[:,-1]: depenpendent variable y
+    ## Output
+    # b_ols: beta hat
+    # sig_ols: std err of beta hat
+    X = df[:,:-1]
+    y = df[:,-1]
+    invXX = np.linalg.inv(X.T @ X)
+    beta_ols = invXX @ X.T @ y
+    epsilon_ols = y - X @ beta_ols
+    Xe = X * np.tile(epsilon_ols,(np.shape(X)[1],1)).T
+    # V_HC0 - White-Heteroskedasticity-Robust VCov
+    Var_ols = invXX @ (Xe.T @ Xe ) @ invXX
+    sig_ols = np.sqrt(np.diag(Var_ols))
+    return [beta_ols, sig_ols]
+```
+#### {-}
+
+Let's take $Y$ and $X$ we defined above and find $\beta$ via GMM. You will see that they are exactly equal to each other. Let $f_i(\beta):=f(Y_i,X_i,\beta)$ be the function of orthogonality conditions evaluated at $i$'s covariates. The orthogonality condition for OLS is $\mathbb{E}(\varepsilon_i X_i) = 0$, where $\varepsilon_i = Y_i - X_i'\beta$ and the expectation is taken over $i$. In the GMM framework, we wish to find $\beta$ that satisfies:
+$$
+    0 = \frac{1}{N}\sum_{i=1}^{N}f_i(\beta) = \frac{1}{N}\sum_{i=1}^{N} \varepsilon_i X_i= \frac{1}{N}\sum_{i=1}^{N} (Y_i - X_i'\beta) \times X_i.
+$$
+Notice there are $k \times 1$ orthogonality conditions: $\varepsilon_i$ is a scalar and $X_i$ is a $k\times1$ vector. Thus, the above equation is an "element-wise" average of a vector-valued function.
+
+What OLS really does is minimizing the sum of squared residuals, $\frac{1}{N}\sum_{i=1}^N \varepsilon_i^2$ where $\varepsilon_i=Y_i-X_i'\beta$. The first order condition of the minimization problem is found by taking a gradient of the sum of squared residuals (as a function of $\beta$, $X$, and $Y$) with respect to $\beta$. 
+$$
+    \frac{\partial}{\partial\beta'}\left(\frac{1}{N}\sum_{i}^{N}Y_i^2 - \frac{1}{N}\sum_{i}^{N} 2 X_i Y_i \beta + \frac{1}{N}\sum_{i}^{N} \beta' X_i X_i' \beta \right) = \frac{1}{N}\sum_{i}^{N}2(X_iX_i'\beta - X_i Y_i) = 0 \\
+    \frac{1}{N}\sum_{i}^{N}(Y_i - X_i'\beta) \times X_i = 0
+$$
+This is exactly the identifying moments that GMM uses.
+
+#### OLS Estimation by GMM {.tabset .tabset-pills}
+
+##### R
+```{r}
+ols_gmm <- function(df, w = diag(length(b_ols)), two_step=FALSE) {
+    # Data
+    n <- nrow(df)
+    x <- as.matrix(df[, seq_len(ncol(df) - 1)])
+    y <- df[, ncol(df)]
+    # Orthogonality conditions
+    f_ortho <- function(b, y, x) {
+        return(rep(y - x %*% b, ncol(x)) * x)
+    }
+    f_sum <- function(b) {
+        return(colSums(f_ortho(b, y, x)))
+    }
+    # GMM criterion function
+    gmm_obj <- function(b, w) {
+        return(n * t(f_sum(b) / n) %*% w %*% (f_sum(b) / n))
+    }
+    # Asymp. Variance
+    gmm_var <- function(n, q, omega, w) {
+        return(matlib::inv(t(q) %*% w %*% q) %*%
+               (t(q) %*% w %*% omega %*% w %*% q) %*%
+               matlib::inv(t(q) %*% w %*% q) / n)
+    }
+    # Optimization
+    gmm_optim1 <- optim(c(rnorm(length(b_ols))), gmm_obj,
+                        gr = NULL, w, method = "BFGS")
+    gmm_beta1 <- gmm_optim1$par
+    gmm_q1 <- numDeriv::jacobian(func = f_sum, x = gmm_beta1) / n
+    gmm_omega1 <- t(f_ortho(gmm_beta1, y, x)) %*%
+                    f_ortho(gmm_beta1, y, x) / n
+    gmm_var1 <- gmm_var(n, gmm_q1, gmm_omega1, w)
+    gmm_sigma1 <- sqrt(diag(gmm_var1))
+    # One-step vs Two-step
+    if (two_step == FALSE) {
+        return(list("b_hat" = gmm_beta1, "sigma_hat" = gmm_sigma1))
+    }
+    if (two_step == TRUE) {
+        gmm_optim2 <- optim(c(rnorm(length(b))), gmm_obj, gr = NULL,
+                            w <- matlib::inv(gmm_omega1), method = "BFGS")
+        gmm_beta2 <- gmm_optim2$par
+        gmm_q2 <- numDeriv::jacobian(func = f_sum, x = gmm_beta2) / n
+        gmm_omega2 <- t(f_ortho(gmm_beta2, y, x)) %*%
+                        f_ortho(gmm_beta2, y, x) / n
+        gmm_var2 <- gmm_var(n, gmm_q2, gmm_omega2, matlib::inv(gmm_omega2))
+        gmm_sigma2 <- sqrt(diag(gmm_var2))
+        return(list("b_hat_1" = gmm_beta1,
+                    "sigma_hat_1" = gmm_sigma1,
+                    "b_hat_2" = gmm_beta2,
+                    "sigma_hat_2" = gmm_sigma2))
+    }
+}
+```
+
+##### Julia
+```{julia}
+function ols_gmm(df, W=I, two_step=false)
+    # Data
+    N = size(df)[1]
+    X = df[:,1:end-1]
+    y = df[:,end]
+    # Orthogonality conditions
+    #%% OLS via GMM
+    f_ortho(b, y, X) = (y - X * b) .* X;
+    f_sum(b) = vec(sum(f_ortho(b, y, X),dims=1));
+    gmm_obj(b, W) = N * (f_sum(b)/N)' * W * (f_sum(b)/N);
+    gmm_var(N, Q, Omega, W) =
+        inv(Q' * W * Q) * (Q' * W * Omega * W * Q) * inv(Q' * W * Q) / N 
+    gmm_optim1 = optimize(b -> gmm_obj(b,W), randn(size(df)[2]-1), BFGS(), autodiff = :forward);
+    gmm_beta1  = gmm_optim1.minimizer
+    gmm_Q1     = ForwardDiff.jacobian(b -> f_sum(b) , gmm_beta1) / N
+    gmm_Omega1 = f_ortho(gmm_beta1, y, X)'f_ortho(gmm_beta1, y, X) / N
+    gmm_var1   = gmm_var(N, gmm_Q1, gmm_Omega1, W)
+    gmm_sigma1 = sqrt.(diag(gmm_var1))
+    if two_step == false
+        return [gmm_beta1, gmm_sigma1]
+    else
+        W = inv(gmm_Omega1) # optimal weighting matrix
+        gmm_optim2 = optimize(b -> gmm_obj(b,W), randn(size(df)[2]-1), BFGS(), autodiff = :forward);
+        gmm_beta2  = gmm_optim2.minimizer
+        gmm_Q2     = ForwardDiff.jacobian(b -> f_sum(b) , gmm_beta2) / N
+        gmm_Omega2 = f_ortho(gmm_beta2, y, X)'f_ortho(gmm_beta2, y, X) / N
+        gmm_var2   = gmm_var(N, gmm_Q2, gmm_Omega2, W)
+        gmm_sigma2 = sqrt.(diag(gmm_var2))
+        return [gmm_beta1, gmm_sigma1, gmm_beta2, gmm_sigma2]
+    end
+end;
+```
+
+##### Python
+```{python}
+def ols_gmm(df,W = np.identity(len(b_ols)),two_step=False):
+    # Data
+    N = np.shape(df)[0]
+    X = df[:,:-1]
+    y = df[:,-1]
+    # Orthogonality conditions
+    def f_ortho(b,y,X):
+        return X * np.tile((y - X @ b),(np.shape(X)[1],1)).T
+    def f_sum(b):
+        return np.sum(f_ortho(b,y,X),axis=0)
+    # GMM criterion function
+    def gmm_obj(b,W):
+        return N * (f_sum(b).T/N) @ W @ (f_sum(b)/N)
+    # Asymptotic Variance
+    def gmm_Var(N,Q,Omega,W):
+        return inv(Q.T @ W @ Q) @ (Q.T @ W @ Omega @ W @ Q) @ inv(Q.T @ W @ Q) / N
+    # Estimation
+    gmm_optim1 = minimize(gmm_obj, randn(np.shape(X)[1]), args=W)
+    gmm_beta1  = gmm_optim1.x
+    gmm_Q1     = jacobian(f_sum)(gmm_beta1) / N
+    gmm_Omega1 = f_ortho(gmm_beta1,y,X).T @ f_ortho(gmm_beta1,y,X) / N
+    gmm_Var1   = gmm_Var(N,gmm_Q1,gmm_Omega1,W)
+    gmm_sigma1 = np.sqrt(np.diag(gmm_Var1))
+    # One-step vs Two-step
+    if two_step==False:
+        return [gmm_beta1, gmm_sigma1]
+    else:
+        W = inv(gmm_Omega1)
+        gmm_optim2 = minimize(gmm_obj, np.random.randn(np.shape(X)[1]), 
+                            args=W)
+        gmm_beta2  = gmm_optim2.x
+        gmm_Q2     = jacobian(f_sum)(gmm_optim2.x) / N
+        gmm_Omega2 = f_ortho(gmm_beta2,y,X).T @ f_ortho(gmm_beta2,y,X) / N
+        gmm_Var2   = gmm_Var(N,gmm_Q2,gmm_Omega2,W)
+        gmm_sigma2 = np.sqrt(np.diag(gmm_Var2))
+        return [gmm_beta1, gmm_sigma1, gmm_betay2, gmm_sigma2]
+```
+#### {-}
+
+#### OLS: Formula and GMM {.tabset .tabset-pills}
+Let's run the code and see the result. As we expect, OLS and GMM estimation give us the same estimates.
+
+```{r, echo=FALSE}
+# Print the results
+print_ols <- function(b, result_ols_formula, result_ols_gmm) {
+    beta_sigma <- function(result) {
+        cat("b_hat   : ")
+        for (i in seq_len(length(result[[1]]))) {
+            cat(sprintf("  %7.4f  ", result[[1]][i]))
+        }
+        cat("\n")
+        cat("s_hat   : ")
+        for (i in seq_len(length(result[[2]]))) {
+            cat(sprintf(" (%7.4f) ", result[[2]][i]))
+        }
+        cat("\n")
+    }
+    cat("DGP     : ")
+    for (i in seq_len(length(b))) {
+        cat(sprintf("     b%1.0f    ", i))
+    }
+    cat("\n        : ")
+    for (i in seq_len(length(b))) {
+        cat(sprintf("  %7.4f  ", b[i]))
+    }
+    cat("\n")
+    cat("Formula : \n")
+    beta_sigma(result_ols_formula)
+    cat("GMM     : \n")
+    beta_sigma(result_ols_gmm)
+}
+```
+
+```{julia, echo=FALSE}
+function print_ols(b, ols_formula, ols_gmm)
+    function beta_sigma(result)
+        print("b_hat   : ")
+        for i in 1:length(result[1])
+            @printf("  %7.4f  ", result[1][i])
+        end
+        print("\n")
+        print("s_hat   : ")
+        for i in 1:length(result[2])
+            @printf(" (%7.4f) ", result[2][i])
+        end
+        print("\n")
+    end
+    print("DGP     : ")
+    for i in 1:length(b)
+        @printf("     b%1.0f    ", i)
+    end
+    print("\n        : ")
+    for i in 1:length(b)
+        @printf("  %7.4f  ", b[i])
+    end
+    print("\n")
+    print("Formula : \n")
+    beta_sigma(ols_formula)
+    print("GMM     : \n")
+    beta_sigma(ols_gmm)
+end;
+```
+
+```{python, echo=FALSE}
+def print_ols(b, result_ols_formula, result_ols_gmm):
+    def beta_sigma(result):
+        print("b_hat   : ", end="")
+        for i in range(len(result[0])):
+            print("  %7.4f  " % result[0][i], end="")
+        print("")
+        print("s_hat   : ", end="")
+        for i in range(len(result[1])):
+            print(" (%7.4f) " % result[1][i], end="")
+        print("")
+    print("DGP     : ", end="")
+    for i in range(len(b)):
+        print("     b%1.0f    " % i, end="")
+    print("")
+    print("        : ", end="")
+    for i in range(len(b)):
+        print("  %7.4f  " % b[i], end="")
+    print("")
+    print("Formula : ")
+    beta_sigma(result_ols_formula)
+    print("GMM     : ")
+    beta_sigma(result_ols_gmm)
+```
+
+##### R
+```{r}
+result_ols_formula <- ols_formula(df_ols)
+result_ols_gmm     <- ols_gmm(df_ols)
+print_ols(b_ols, result_ols_formula, result_ols_gmm)
+```
+##### Julia
+```{julia}
+result_ols_formula = ols_formula(df_ols);
+result_ols_gmm     = ols_gmm(df_ols, I, false);
+print_ols(b_ols, result_ols_formula, result_ols_gmm)
+```
+##### Python
+```{python}
+result_ols_formula = ols_formula(df_ols)
+result_ols_gmm     = ols_gmm(df_ols, two_step = False) # W = identity
+print_ols(b_ols, result_ols_formula, result_ols_gmm)
+```
+#### {-}
+
+### Example 2: LIV {#gmm_liv}
+
+Let's scale up a little bit and consider linear instrumental variable estimation. 2SLS in the over-identified case is what we will use in GMM.
+
+If we have more instruments than the number of endogenous variables, we call the model is over-identified. In the example below, I set $X_2$ to be the endogenous variable and provide 2 instruments, $Z_1$ and $Z_2$.
+$$
+\begin{align*}
+\mu(X_0,X_1,X_2,Z_1,Z_2,\varepsilon) &= (1 \; 0 \; 0 \; 0 \; 0 \; 0)^\prime \\
+\Sigma(X_0,X_1,X_2,Z_1,Z_2,\varepsilon) &= 
+\begin{bmatrix}
+  0.0 & 0.0 & 0.0 & 0.0 & 0.0 & 0.0 \\
+  0.0 & 1.0 & 0.0 & 0.0 & 0.0 & 0.0 \\
+  0.0 & 0.0 & 2.0 & 0.3 & -.4 & 0.5 \\
+  0.0 & 0.0 & 0.3 & 1.0 & 0.4 & 0.0 \\
+  0.0 & 0.0 & -.4 & 0.4 & 2.0 & 0.0 \\
+  0.0 & 0.0 & 0.5 & 0.0 & 0.0 & 3.0
+\end{bmatrix}\\
+(X_0,X_1,X_2,Z_1,Z_2,\varepsilon) &\sim \mathcal{N}(\mu,\Sigma)
+\end{align*}
+$$
+
+#### Generate data {.tabset .tabset-pills}
+
+The data consist of independent variables X1-X3, instrument variables Z1-Z2, and dependent variable y:
+
+- X1: constant
+- X2: exogenous variable
+- X3: endogenous variable
+- Z1, Z2: instruments for X3
+- y: dependent variable
+
+For comparability, I will use the dataset R created.
+
+##### R
+```{r}
+dgp_liv <- function(n, b_liv) {
+    set.seed(42)
+    mu <- c(1.0, rep(0.0, 5))
+    # X1 X2 X3 Z1 Z2 e
+    covar <- matrix(c(0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                      0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                      0.0, 0.0, 2.0, 0.3, -.4, 0.5,
+                      0.0, 0.0, 0.3, 1.0, 0.4, 0.0,
+                      0.0, 0.0, -.4, 0.4, 2.0, 0.0,
+                      0.0, 0.0, 0.5, 0.0, 0.0, 3.0),
+                    nrow = 6)
+    df <- MASS::mvrnorm(n = n, mu, covar, tol = 1e-8);
+    x <- df[, 1:3]
+    e <- df[, ncol(df)]
+    y <- x %*% b_liv + e
+    df <- data.frame(df[, seq_len(ncol(df) - 1)], y) # x1-x"length(b)-1"
+    df <- df %>% dplyr::rename(Z1 = X4, Z2 = X5) # nolint
+    return(list("df" = df, "covar" = covar))
+}
+```
+##### Julia
+```{julia}
+function DGP_liv(N, b_liv)
+    Random.seed!(42)
+    mu = zeros(5)
+    # Covariance for X2 X3 Z1 Z2 e # We append X1 later in Julia
+    covar = [1.0 0.0 0.0 0.0 0.0;
+             0.0 2.0 0.3 -.4 0.5;
+             0.0 0.3 1.0 0.4 0.0;
+             0.0 -.4 0.4 2.0 0.0;
+             0.0 0.5 0.0 0.0 3.0];
+    df = [ones(N) transpose(rand(MvNormal(mu,covar),N))]
+    X  = df[:, 1:3]
+    e  = df[:, end]
+    y  = X * b_liv + e
+    df = DataFrame(
+        X1 = df[:,1], X2 = df[:,2], X3 = df[:,3],
+        Z1 = df[:,4], Z2 = df[:,5], y = y)
+    return [df, covar]
+end;
+```
+##### Python
+```{python}
+def DGP_liv(N,b):
+    np.random.seed(42)
+    mu = np.r_[1.0,np.repeat(0.0,5)]
+    # X0 X1 X2 Z1 Z2 e
+    covar = np.array([[0.0,0.0,0.0,0.0,0.0,0.0],
+                      [0.0,1.0,0.0,0.0,0.0,0.0],
+                      [0.0,0.0,2.0,0.3,-.4,0.5],
+                      [0.0,0.0,0.3,1.0,0.4,0.0],
+                      [0.0,0.0,-.4,0.4,2.0,0.0],
+                      [0.0,0.0,0.5,0.0,0.0,3.0]])
+    df = np.random.multivariate_normal(mu,covar,N)
+    X  = df[:,:3]
+    e  = df[:,-1]
+    y  = X @ b + e
+    df = np.c_[df[:,:-1],y]
+    return [df, covar]
+```
+##### Data
+```{r, results='hide'}
+# R
+n               <- 10000
+b_liv           <- c(0.5, 1.25, -1.5)
+df_liv          <- dgp_liv(n, b_liv)$df
+df_liv_covar    <- dgp_liv(n, b_liv)$covar
+x               <- as.matrix(df_liv[, seq_len(length(b_liv))])
+z               <- as.matrix(df_liv[, (length(b_liv) + 1):(ncol(df_liv) - 1)])
+z_z1            <- matrix(c(x[, 1], x[, 2], z[, 1]), nrow = n)
+z_z2            <- matrix(c(x[, 1], x[, 2], z[, 2]), nrow = n)
+z_overid        <- matrix(c(x[, 1], x[, 2], z[, 1], z[, 2]), nrow = n)
+y               <- df_liv[, ncol(df_liv)]
+write.csv(df_liv, "./liv_dataset.csv", row.names = FALSE)
+```
+
+```{julia, results='hide'}
+# Julia
+N               = 10_000;
+b_liv           = [0.5, 1.25, -1.5];
+df_liv = DataFrame(CSV.File("./liv_dataset.csv"));
+# df_liv          = DGP_liv(N, b_liv)[1];
+df_liv_covar    = DGP_liv(N, b_liv)[2];
+X               = Matrix(df_liv[:, 1:length(b_liv)]);
+Z               = Matrix(df_liv[:, (length(b_liv)+1):end-1]);
+Z_Z1            = Matrix(df_liv[:, [:X1, :X2, :Z1]]);
+Z_Z2            = Matrix(df_liv[:, [:X1, :X2, :Z2]]);
+Z_overid        = Matrix(df_liv[:, [:X1, :X2, :Z1, :Z2]]);
+y               = df_liv[:, end];
+```
+
+```{python, results='hide'}
+# Python
+N               = 10000
+b_liv           = [0.5, 1.25, -1.5]
+df_liv = pd.read_csv("./liv_dataset.csv").to_numpy()
+# df_liv          = DGP_liv(N, b_liv)[0]
+df_liv_covar    = DGP_liv(N, b_liv)[1]
+X               = df_liv[:, 0:len(b_liv)]
+Z               = df_liv[:, (len(b_liv)):-1]
+Z_Z1            = df_liv[:, [0, 1, 3]]
+Z_Z2            = df_liv[:, [0, 1, 4]]
+Z_overid        = df_liv[:, [0, 1, 3, 4]]
+y               = df_liv[:, -1]
+```
+#### {-}
+
+
+#### LIV Estimation by Formula {.tabset .tabset-pills}
+
+Again, let's code LIV regression model for fun: $\beta_{iv}=(X'Z)^{-1}Z'Y$.
+
+##### R
+```{r}
+liv_formula <- function(x, z, y) {
+    inv_xz <- matlib::inv(t(x) %*% z)
+    b_iv <- inv_xz %*% t(z) %*% y
+    e_iv <- y - x %*% b_iv
+    ze <- z * rep(e_iv, ncol(z))
+    var_iv <- inv_xz %*% t(ze) %*% ze %*% inv_xz
+    sig_iv <- sqrt(diag(var_iv))
+    return(list("b_hat" = b_iv, "sigma_hat" = sig_iv))
+}
+```
+##### Julia
+```{julia}
+function liv_formula(X, Z, y)
+    invXZ  = inv(X'Z)
+    b_iv   = invXZ * Z'y
+    e_iv   = y - X * b_iv
+    Ze     = Z .* e_iv
+    var_iv = invXZ * (Ze' * Ze) * invXZ
+    sig_iv = sqrt.(diag(var_iv))
+    return [b_iv, sig_iv]
+end;
+```
+##### Python
+```{python}
+def liv_formula(X, Z, y):
+    invXZ  = inv(X.T @ Z)
+    b_iv   = invXZ @ Z.T @ y
+    e_iv   = y - X @ b_iv
+    Ze = Z * np.tile(e_iv,(len(b_iv),1)).T
+    var_iv = invXZ @ (Ze.T @ Ze) @ invXZ
+    sig_iv = np.sqrt(np.diag(var_iv))
+    return [b_iv, sig_iv]
+```
+#### {-}
+
+#### LIV Estimation by 2SLS {.tabset .tabset-pills}
+In 2SLS regression, we know we can use weighting matrix in the formula so that we can make the estimates more efficient. We know the closed-form solution to this: $\beta_{2sls}=((X'Z)W(Z'X))^{-1} (X'Z) W Z' Y$. In LIV, we know that the optimal weight is $W=(Z'Z)^{-1}$.
+
+##### R
+```{r}
+liv_2sls <- function(x, z, y) {
+    q_xz <- t(x) %*% z
+    q_zx <- t(z) %*% x
+    q_zz <- t(z) %*% z # The inverse of this is our 'W'
+    b_2sls <- matlib::inv(q_xz %*% inv(q_zz) %*% q_zx) %*%
+            q_xz %*% matlib::inv(q_zz) %*% t(z) %*% y
+    e_2sls <- y - x %*% b_2sls
+    ze_2sls <- z * rep(e_2sls, ncol(z))
+    omega_2sls <- t(ze_2sls) %*% ze_2sls
+    var_2sls <- inv(q_xz %*% inv(q_zz) %*% q_zx) %*%
+                (q_xz %*% inv(q_zz) %*% omega_2sls %*% inv(q_zz) %*% q_zx) %*%
+                inv(q_xz %*% inv(q_zz) %*% q_zx)
+    sig_2sls <- sqrt(diag(var_2sls))
+    return(list("b_hat" = b_2sls, "sigma_hat" = sig_2sls))
+}
+```
+##### Julia
+```{julia}
+function liv_2sls(X, Z, y)
+    Q_xz = X'Z
+    Q_zx = Z'X
+    Q_zz = Z'Z # The inverse of this is our 'W'
+    b_2sls = inv(Q_xz * inv(Q_zz) * Q_zx) *
+                 Q_xz * inv(Q_zz) * Z'y
+    e_2sls = y - X * b_2sls
+    Ze_2sls = Z .* e_2sls
+    Omega_2sls = Ze_2sls'Ze_2sls
+    var_2sls = 
+        inv(Q_xz * inv(Q_zz) * Q_zx) *
+           (Q_xz * inv(Q_zz) * Omega_2sls * inv(Q_zz) * Q_zx) *
+        inv(Q_xz * inv(Q_zz) * Q_zx)
+    sig_2sls = sqrt.(diag(var_2sls))
+    return [b_2sls, sig_2sls]
+end;
+```
+##### Python
+```{python}
+def liv_2sls(X, Z, y):
+    Q_xz = X.T @ Z
+    Q_zx = Z.T @ X
+    Q_zz = Z.T @ Z # The inverse of this is our 'W'
+    b_2sls = (inv(Q_xz @ inv(Q_zz) @ Q_zx) @
+                 Q_xz @ inv(Q_zz) @ Z.T @ y)
+    e_2sls = y - X @ b_2sls
+    Ze_2sls = Z * np.tile(e_2sls,(np.shape(Z)[1],1)).T
+    Omega_2sls = Ze_2sls.T @ Ze_2sls
+    var_2sls = (
+        inv(Q_xz @ inv(Q_zz) @ Q_zx) @
+           (Q_xz @ inv(Q_zz) @ Omega_2sls @ inv(Q_zz) @ Q_zx) @
+        inv(Q_xz @ inv(Q_zz) @ Q_zx))
+    sig_2sls = np.sqrt(np.diag(var_2sls))
+    return [b_2sls, sig_2sls]
+```
+#### {-}
+
+#### LIV Estimation by GMM {.tabset .tabset-pills}
+
+Let's see how this is applied in GMM framework. $f_i(\beta):=f(Y_i,X_i,Z_i,\beta)$ be the function of orthogonality conditions. The orthogonality condition for LIV is $\mathbb{E}(\varepsilon_i Z_i) = 0$, where $\varepsilon_i = Y_i - X_i'\beta$ and the expectation is taken over $i$. In the GMM framework, we wish to find $\beta$ that satisfies below:
+$$
+    0 = \frac{1}{N}\sum_{i=1}^{N}f_i(\beta) = \frac{1}{N}\sum_{i=1}^{N} \varepsilon_i Z_i= \frac{1}{N}\sum_{i=1}^{N} (Y_i - X_i'\beta) \times Z_i.
+$$
+If we use both $Z_1$ and $Z_2$, then we have **4** orthogonality conditions and **3** parameters to estimate. It is almost surely impossible to find $\beta$ where the moment is zero. Thus, we just find $\beta$ that makes the moment as close to zero as possible. What overidentifying restrictions buy us is that we can introduce some positive definite weighting matrix $W$ and make the estimate more efficient.
+
+##### R
+```{r}
+liv_gmm <- function(x, z, y, w = diag(ncol(z)), two_step = FALSE) {
+    n <- nrow(x)
+    # Orthogonality conditions
+    f_ortho <- function(b, y, x, z) {
+        return(rep(y - x %*% b, ncol(z)) * z)
+    }
+    f_sum <- function(b) {
+        return(colSums(f_ortho(b, y, x, z)))
+    }
+    # GMM criterion function
+    gmm_obj <- function(b, w) {
+        return(n * t(f_sum(b) / n) %*% w %*% (f_sum(b) / n))
+    }
+    # Asymp. Variance
+    gmm_var <- function(n, q, omega, w) {
+        return(matlib::inv(t(q) %*% w %*% q) %*%
+                (t(q) %*% w %*% omega %*% w %*% q) %*%
+                matlib::inv(t(q) %*% w %*% q) / n)
+    }
+    # Optimization
+    gmm_optim1 <- optim(c(rnorm(ncol(x))), gmm_obj, gr = NULL,
+                        w, method = "BFGS")
+    gmm_beta1 <- gmm_optim1$par
+    gmm_q1 <- numDeriv::jacobian(func = f_sum, x = gmm_beta1) / n
+    gmm_omega1 <- t(f_ortho(gmm_optim1$par, y, x, z)) %*%
+                    f_ortho(gmm_beta1, y, x, z) / n
+    gmm_var1 <- gmm_var(n, gmm_q1, gmm_omega1, w)
+    gmm_sigma1 <- sqrt(diag(gmm_var1))
+    # One-step vs Two-step
+    if (two_step == FALSE) {
+        return(list("b_hat_1" = gmm_beta1, "sigma_hat_1" = gmm_sigma1))
+    }
+    if (two_step == TRUE) {
+        optimal_w <- matlib::inv(gmm_omega1)
+        gmm_optim2 <- optim(c(rnorm(ncol(x))), gmm_obj, gr = NULL,
+                            w <- optimal_w, method = "BFGS")
+        gmm_beta2 <- gmm_optim2$par
+        gmm_q2 <- numDeriv::jacobian(func = f_sum, x = gmm_beta2) / n
+        gmm_omega2 <- t(f_ortho(gmm_beta2, y, x, z)) %*%
+                        f_ortho(gmm_beta2, y, x, z) / n
+        gmm_var2 <- gmm_var(n, gmm_q2, gmm_omega2, optimal_w)
+        gmm_sigma2 <- sqrt(diag(gmm_var2))
+        return(list("b_hat_1" = gmm_beta1,
+                    "sigma_hat_1" = gmm_sigma1,
+                    "b_hat_2" = gmm_beta2,
+                    "sigma_hat_2" = gmm_sigma2))
+    }
+}
+```
+##### Julia
+```{julia}
+function liv_gmm(X, Z, y, W = I, two_step=false)
+    # Data
+    N = size(X)[1]
+    # Orthogonality conditions
+    f_ortho(b, y, X, Z) = (y - X * b) .* Z;
+    f_sum(b) = vec(sum(f_ortho(b, y, X, Z),dims=1));
+    gmm_obj(b, W) = N * (f_sum(b)/N)' * W * (f_sum(b)/N);
+    gmm_var(N, Q, Omega, W) =
+        inv(Q' * W * Q) * (Q' * W * Omega * W * Q) * inv(Q' * W * Q) / N 
+    gmm_optim1 = optimize(b -> gmm_obj(b,W), randn(size(X)[2]), BFGS(), autodiff = :forward);
+    gmm_beta1  = gmm_optim1.minimizer
+    gmm_Q1     = ForwardDiff.jacobian(b -> f_sum(b) , gmm_beta1) / N
+    gmm_Omega1 = f_ortho(gmm_beta1, y, X, Z)'f_ortho(gmm_beta1, y, X, Z) / N
+    gmm_var1   = gmm_var(N, gmm_Q1, gmm_Omega1, W)
+    gmm_sigma1 = sqrt.(diag(gmm_var1))
+    if two_step == false
+        return [gmm_beta1, gmm_sigma1]
+    else
+        W = inv(gmm_Omega1) # optimal weighting matrix
+        gmm_optim2 = optimize(b -> gmm_obj(b, W), randn(size(X)[2]), 
+                              BFGS(), autodiff = :forward);
+        gmm_beta2  = gmm_optim2.minimizer
+        gmm_Q2     = ForwardDiff.jacobian(b -> f_sum(b) , gmm_beta2) / N
+        gmm_Omega2 = f_ortho(gmm_beta2, y, X, Z)'f_ortho(gmm_beta2, y, X, Z) / N
+        gmm_var2   = gmm_var(N, gmm_Q2, gmm_Omega2, W)
+        gmm_sigma2 = sqrt.(diag(gmm_var2))
+        return [gmm_beta1, gmm_sigma1, gmm_beta2, gmm_sigma2]
+    end
+end;
+```
+##### Python
+```{python}
+def liv_gmm(X, Z, y, W = np.identity(np.shape(Z)[1]), two_step=False):
+    # Data
+    N = np.shape(X)[0]
+    # Orthogonality conditions
+    def f_ortho(b, y, X, Z):
+        return Z * np.tile((y - X @ b),(np.shape(Z)[1],1)).T
+    def f_sum(b):
+        return np.sum(f_ortho(b, y, X, Z),axis=0)
+    # GMM criterion function
+    def gmm_obj(b,W):
+        return N * (f_sum(b).T/N) @ W @ (f_sum(b)/N)
+    # Asymptotic Variance
+    def gmm_Var(N,Q,Omega,W):
+        return inv(Q.T @ W @ Q) @ (Q.T @ W @ Omega @ W @ Q) @ inv(Q.T @ W @ Q) / N
+    # Estimation
+    gmm_optim1 = minimize(gmm_obj, randn(np.shape(X)[1]), args=W)
+    gmm_beta1  = gmm_optim1.x
+    gmm_Q1     = jacobian(f_sum)(gmm_beta1) / N
+    gmm_Omega1 = f_ortho(gmm_beta1, y, X, Z).T @ f_ortho(gmm_beta1, y, X, Z) / N
+    gmm_Var1   = gmm_Var(N, gmm_Q1, gmm_Omega1, W)
+    gmm_sigma1 = np.sqrt(np.diag(gmm_Var1))
+    # One-step vs Two-step
+    if two_step==False:
+        return [gmm_beta1, gmm_sigma1]
+    else:
+        W = inv(gmm_Omega1)
+        gmm_optim2 = minimize(gmm_obj, randn(np.shape(X)[1]), args=W)
+        gmm_beta2  = gmm_optim2.x
+        gmm_Q2     = jacobian(f_sum)(gmm_optim2.x) / N
+        gmm_Omega2 = f_ortho(gmm_beta2, y, X, Z).T @ f_ortho(gmm_beta2, y, X, Z) / N
+        gmm_Var2   = gmm_Var(N,gmm_Q2, gmm_Omega2, W)
+        gmm_sigma2 = np.sqrt(np.diag(gmm_Var2))
+        return [gmm_beta1, gmm_sigma1, gmm_beta2, gmm_sigma2]
+```
+#### {-}
+
+There is a small difference between two-step GMM and One-step GMM with $W=(Z'Z)^{-1}$ because two-step GMM uses the updated weighting matrix $\hat{W}$ from the first step. As you increase $N$, this difference will disappear. If we use $W=(Z'Z)^{-1}$ in the first step, we would see no difference.
+
+#### LIV Estimation Summary {.tabset .tabset-pills}
+
+```{r, echo=FALSE}
+print_liv <- function(b, liv_ols,
+                    liv_z1, liv_z2, liv_2sls_z1, liv_2sls_z2,
+                    liv_2sls_overid, liv_gmm_overid) {
+    beta_sigma <- function(result) {
+        cat("b_hat   : ")
+        for (i in seq_len(length(result[[1]]))) {
+            cat(sprintf("  %7.4f  ", result[[1]][i]))
+        }
+        cat("\n")
+        cat("s_hat   : ")
+        for (i in seq_len(length(result[[2]]))) {
+            cat(sprintf(" (%7.4f) ", result[[2]][i]))
+        }
+        cat("\n")
+    }
+    cat("DGP     : ")
+    for (i in seq_len(length(b))) {
+        cat(sprintf("     b%1.0f    ", i))
+    }
+    cat("\n        : ")
+    for (i in seq_len(length(b))) {
+        cat(sprintf("  %7.4f  ", b[i]))
+    }
+    cat("\n")
+    cat("-------------------------------------------\n")
+    cat("Formula : \n")
+    cat("-------------------------------------------\n")
+    cat("No instrument \n")
+    beta_sigma(liv_ols) # no instrument
+    cat("Using Z1 \n")
+    beta_sigma(liv_z1)
+    cat("Using Z2 \n")
+    beta_sigma(liv_z2)
+    cat("-------------------------------------------\n")
+    cat("2SLS    : \n")
+    cat("-------------------------------------------\n")
+    cat("Using Z1 \n")
+    beta_sigma(liv_2sls_z1)
+    cat("Using Z2 \n")
+    beta_sigma(liv_2sls_z2)
+    cat("Overidentified \n")
+    beta_sigma(liv_2sls_overid)
+    cat("-------------------------------------------\n")
+    cat("GMM     :\n")
+    cat("-------------------------------------------\n")
+    if (length(liv_gmm_overid) == 2) {
+        cat("One-step\n")
+        beta_sigma(liv_gmm_overid[1:2])
+    }
+    if (length(liv_gmm_overid) == 4) {
+        cat("One-step\n")
+        beta_sigma(liv_gmm_overid[1:2])
+        cat("Two-step\n")
+        beta_sigma(liv_gmm_overid[3:4])
+    }
+}
+```
+
+```{julia, echo=FALSE}
+# Print the results
+function print_liv(b, liv_ols,
+    liv_z1, liv_z2, liv_2sls_z1, liv_2sls_z2,
+    liv_2sls_overid, liv_gmm_overid)
+    function beta_sigma(result)
+        print("b_hat   : ")
+        for i in 1:length(result[1])
+            @printf("  %7.4f  ", result[1][i])
+        end
+        print("\n")
+        print("s_hat   : ")
+        for i in 1:length(result[2])
+            @printf(" (%7.4f) ", result[2][i])
+        end
+        print("\n")
+    end
+    print("DGP     : ")
+    for i in 1:length(b)
+        @printf("     b%1.0f    ", i)
+    end
+    print("\n        : ")
+    for i in 1:length(b)
+        @printf("  %7.4f  ", b[i])
+    end
+    print("\n")
+    print("-------------------------------------------\n")
+    print("Formula : \n")
+    print("-------------------------------------------\n")
+    print("No instrument \n")
+    beta_sigma(liv_ols)
+    print("Using Z1 \n")
+    beta_sigma(liv_z1)
+    print("Using Z2 \n")
+    beta_sigma(liv_z2)
+    print("-------------------------------------------\n")
+    print("2SLS    : \n")
+    print("-------------------------------------------\n")
+    print("Using Z1 \n")
+    beta_sigma(liv_2sls_z1)
+    print("Using Z2 \n")
+    beta_sigma(liv_2sls_z2)
+    print("Overidentified \n")
+    beta_sigma(liv_2sls_overid)
+    print("-------------------------------------------\n")
+    print("GMM     :\n")
+    print("-------------------------------------------\n")    
+    if length(liv_gmm_overid) == 2
+        print("One-step\n")
+        beta_sigma(liv_gmm_overid[1:2])
+    end
+    if length(liv_gmm_overid) == 4
+        print("One-step\n")
+        beta_sigma(liv_gmm_overid[1:2])
+        print("Two-step\n")
+        beta_sigma(liv_gmm_overid[3:4])
+    end
+end;
+```
+
+
+```{python, echo=FALSE}
+# Print the results
+def print_liv(b, liv_ols,
+    liv_z1, liv_z2, liv_2sls_z1, liv_2sls_z2,
+    liv_2sls_overid, liv_gmm_overid):
+    def beta_sigma(result):
+        print("b_hat   : ",end="")
+        for i in range(len(result[0])):
+            print("  %7.4f  " % result[0][i],end="")
+        print("")
+        print("s_hat   : ",end="")
+        for i in range(len(result[1])):
+            print(" (%7.4f) " % result[1][i],end="")
+        print("")
+    print("DGP     : ",end="")
+    for i in range(1,len(b)+1):
+        print("     b%1.0f    " % i,end="")
+    print("")
+    print("        : ",end="")
+    for i in range(len(b)):
+        print("  %7.4f  " % b[i],end="")
+    print("")
+    print("-------------------------------------------")
+    print("Formula : ")
+    print("-------------------------------------------")
+    print("No instrument ")
+    beta_sigma(liv_ols)
+    print("Using Z1 ")
+    beta_sigma(liv_z1)
+    print("Using Z2 ")
+    beta_sigma(liv_z2)
+    print("-------------------------------------------")
+    print("2SLS    : ")
+    print("-------------------------------------------")
+    print("Using Z1 ")
+    beta_sigma(liv_2sls_z1)
+    print("Using Z2 ")
+    beta_sigma(liv_2sls_z2)
+    print("Overidentified ")
+    beta_sigma(liv_2sls_overid)
+    print("-------------------------------------------")
+    print("GMM     : ")
+    print("-------------------------------------------")    
+    if len(liv_gmm_overid) == 2:
+        print("One-step")
+        beta_sigma(liv_gmm_overid[0:2])
+    if len(liv_gmm_overid) == 4:
+        print("One-step")
+        beta_sigma(liv_gmm_overid[0:2])
+        print("Two-step")
+        beta_sigma(liv_gmm_overid[2:4])
+```
+
+##### R
+```{r}
+liv_ols         <- liv_formula(x, x, y);
+liv_z1          <- liv_formula(x, z_z1, y);
+liv_z2          <- liv_formula(x, z_z2, y);
+liv_2sls_z1     <- liv_2sls(x, z_z1, y);
+liv_2sls_z2     <- liv_2sls(x, z_z2, y);
+liv_2sls_overid <- liv_2sls(x, z_overid, y);
+liv_gmm_overid  <- liv_gmm(x, z_overid, y, two_step = TRUE);
+print_liv(b_liv, liv_ols, liv_z1, liv_z2,
+    liv_2sls_z1, liv_2sls_z2, liv_2sls_overid, liv_gmm_overid)
+```
+
+##### Julia
+```{julia}
+liv_ols         = liv_formula(X, X, y);
+liv_z1          = liv_formula(X, Z_Z1, y);
+liv_z2          = liv_formula(X, Z_Z2, y);
+liv_2sls_z1     = liv_2sls(X, Z_Z1, y);
+liv_2sls_z2     = liv_2sls(X, Z_Z2, y);
+liv_2sls_overid = liv_2sls(X, Z_overid, y);
+liv_gmm_overid  = liv_gmm(X, Z_overid, y, I, true);
+print_liv(b_liv, liv_ols, liv_z1, liv_z2, 
+    liv_2sls_z1, liv_2sls_z2, liv_2sls_overid, liv_gmm_overid)
+```
+
+##### Python
+```{python}
+liv_ols         = liv_formula(X, X, y)
+liv_z1          = liv_formula(X, Z_Z1, y)
+liv_z2          = liv_formula(X, Z_Z2, y)
+liv_2sls_z1     = liv_2sls(X, Z_Z1, y)
+liv_2sls_z2     = liv_2sls(X, Z_Z2, y)
+liv_2sls_overid = liv_2sls(X, Z_overid, y)
+liv_gmm_overid  = liv_gmm(X, Z_overid, y, np.identity(np.shape(Z_overid)[1]), True)
+print_liv(b_liv, liv_ols, liv_z1, liv_z2, 
+    liv_2sls_z1, liv_2sls_z2, liv_2sls_overid, liv_gmm_overid)
+```
+
+References:
+
+  - [Professor Miller's Lecture Note Chapters 3 and 12](https://comlabgames.com/structuraleconometrics/)
+  - [Bruce Hansen's econometrics textbook](https://www.ssc.wisc.edu/~bhansen/econometrics/Econometrics.pdf)
