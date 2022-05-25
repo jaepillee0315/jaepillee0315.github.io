@@ -12,4 +12,4 @@ Professor Miller's [structural econometrics](https://comlabgames.com/structurale
 - [GMM: Hansen and Singleton (1982)](/structural-econometrics/2. Hansen and Singleton/2_GMM.html)
 
 Microeconomics
-- [Cookbook approach to constrained optimization](/_teaching/Constrained_Optimization.pdf)
+- [Cookbook approach to constrained optimization]({{ https://jaepillee0315.github.io/ }}/_teaching/Constrained_Optimization.pdf)
