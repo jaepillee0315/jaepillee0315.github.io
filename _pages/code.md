@@ -1,6 +1,6 @@
 ---
 layout: archive
-title: "Codes"
+title: ""
 permalink: /code/
 author_profile: true
 ---
@@ -10,5 +10,5 @@ author_profile: true
 Julia
 ======
   <ul>{% for post in site.julia %}
-    {% include archive-single.html %}
+    {% include %}
   {% endfor %}</ul>
