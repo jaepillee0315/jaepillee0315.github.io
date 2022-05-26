@@ -1,5 +1,5 @@
 ---
-title: "Some derivations using T1EV errors"
+title: "Some results with T1EV errors"
 collection: teaching
 ---
 
