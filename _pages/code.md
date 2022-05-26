@@ -10,5 +10,5 @@ author_profile: true
 Julia
 ======
   <ul>{% for post in site.julia %}
-    {% include %}
+    {{post}}
   {% endfor %}</ul>
