@@ -10,5 +10,5 @@ author_profile: true
 Julia
 ======
   <ul>{% for post in site.julia %}
-    {% include archive-single-cv.html %}
+    {% include archive-single.html %}
   {% endfor %}</ul>
