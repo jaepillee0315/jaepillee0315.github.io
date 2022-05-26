@@ -12,5 +12,5 @@ Professor Miller's [structural econometrics](https://comlabgames.com/structurale
 - [GMM: Hansen and Singleton (1982)](/structural-econometrics/2. Hansen and Singleton/2_GMM.html)
 
 Microeconomics
-- [Some (tedious) derivations for discrete choice models with T1EV](/_teaching/derivation_t1ev.md)
-- [Cookbook approach to constrained optimization](/_teaching/constrained_optimization.md)
+- [Some (tedious) derivations for discrete choice models with T1EV](/_teaching/derivation_t1ev.pdf)
+- [Cookbook approach to constrained optimization](/_teaching/constrained_optimization.pdf)
