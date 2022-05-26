@@ -1,10 +1,8 @@
 ---
 layout: archive
-title: ""
+title: "Codes"
 permalink: /code/
 author_profile: true
-redirect_from:
-  - /resume
 ---
 
 {% include base_path %}
@@ -12,5 +10,5 @@ redirect_from:
 Julia
 ======
   <ul>{% for post in site.julia %}
-    {% include post %}
+    {% include archive-single-cv.html %}
   {% endfor %}</ul>
