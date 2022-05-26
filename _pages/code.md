@@ -12,5 +12,5 @@ redirect_from:
 Julia
 ======
   <ul>{% for post in site.julia %}
-    {% include archive-single-cv.html %}
+    {% include post %}
   {% endfor %}</ul>
