@@ -5,6 +5,8 @@ permalink: /teaching/
 author_profile: true
 ---
 
+{% include base_path %}
+
 ## Teaching Assistant
 
 Professor Miller's [structural econometrics](https://comlabgames.com/structuraleconometrics/):
@@ -14,3 +16,8 @@ Professor Miller's [structural econometrics](https://comlabgames.com/structurale
 Microeconomics
 - [Some (tedious) derivations for discrete choice models with T1EV](site.teaching/derivation_t1ev.md)
 - [Cookbook approach to constrained optimization](site.teaching/constrained_optimization.md)
+
+======
+  <ul>{% for post in site.teaching %}
+    {% include archive-single-cv.html %}
+  {% endfor %}</ul>
