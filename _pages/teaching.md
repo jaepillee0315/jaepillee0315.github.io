@@ -7,7 +7,7 @@ author_profile: true
 
 ## Teaching Assistant
 
-[Structural Econometrics](https://comlabgames.com/structuraleconometrics/):
+[Structural Econometrics](https://comlabgames.com/structuraleconometrics/)
 - [GMM: OLS and LIV](/structural-econometrics/1. GMM; OLS and LIV/GMM-OLS-and-IV.html)
 - [GMM: Hansen and Singleton (1982)](/structural-econometrics/2. Hansen and Singleton/2_GMM.html)
 
