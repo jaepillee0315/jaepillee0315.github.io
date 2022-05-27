@@ -5,10 +5,7 @@ permalink: /code/
 author_profile: true
 ---
 
-{% include base_path %}
-
-Julia
-======
-  <ul>{% for post in site.julia %}
-    {{post}}
-  {% endfor %}</ul>
+- Julia
+  {% for post in site.julia %}
+  - [{{ post.title }}]({{ post.url | relative_url }})
+  {% endfor %}
