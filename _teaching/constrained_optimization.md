@@ -1,10 +1,8 @@
 ---
-title: "Constrained Opimization"
+title: "Constrained Optimization"
 collection: teaching
 type: teaching
 ---
-
-nevermind the link below: under construction
 
 [Constrained_Optimization.pdf]({{ https://jaepillee0315.github.io/ }}/files/Constrained_Optimization.pdf)
 
