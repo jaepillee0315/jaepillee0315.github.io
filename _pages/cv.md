@@ -9,4 +9,4 @@ redirect_from:
 
 [CV_Jaepil_Lee.pdf]({{ https://jaepillee0315.github.io/ }}/files/CV_Jaepil_Lee.pdf)
 
-<object data="/files/CV_Jaepil_Lee.pdf" width="auto" height="auto" type='application/pdf'></object>
+<object data="/files/CV_Jaepil_Lee.pdf" width="100%" height="100%" type='application/pdf'></object>
