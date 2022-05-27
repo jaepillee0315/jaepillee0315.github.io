@@ -14,3 +14,7 @@ Professor Miller's [structural econometrics](https://comlabgames.com/structurale
 Microeconomics
 - [Some (tedious) derivations for discrete choice models with T1EV](/_teaching/derivation_t1ev.md)
 - [Cookbook approach to constrained optimization](/_teaching/constrained_optimization.md)
+
+{% for post in site.teaching %}
+- [{{ post.title }}]({{ post.url }})
+{% endfor %}
