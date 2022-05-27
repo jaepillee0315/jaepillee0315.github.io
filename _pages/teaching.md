@@ -16,5 +16,5 @@ Microeconomics
 - [Cookbook approach to constrained optimization](/_teaching/constrained_optimization.md)
 
 {% for post in site.teaching %}
-- [{{ post.title }}]({{ post.url }})
+- [{{ post.title }}]({{ post.url | relative_url }})
 {% endfor %}
