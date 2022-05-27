@@ -1,8 +1,6 @@
 ---
 title: "Constrained Optimization"
 collection: teaching
-date: 2022-05-15
-type: teaching
 ---
 
 [Constrained_Optimization.pdf]({{ https://jaepillee0315.github.io/ }}/files/Constrained_Optimization.pdf)
