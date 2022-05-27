@@ -1,6 +1,7 @@
 ---
 title: ""
 collection: teaching
+type: teaching
 ---
 
 [Constrained_Optimization.pdf]({{ https://jaepillee0315.github.io/ }}/_teaching/Constrained_Optimization.pdf)
