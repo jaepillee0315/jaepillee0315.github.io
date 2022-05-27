@@ -1,6 +1,7 @@
 ---
 title: "Constrained Optimization"
 collection: teaching
+date: 2022-05-15
 type: teaching
 ---
 
