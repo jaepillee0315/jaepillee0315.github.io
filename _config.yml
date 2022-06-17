@@ -313,6 +313,7 @@ whitelist:
   - jekyll-feed
   - jemoji
 
+safe: false
 
 # Archives
 #  Type
