@@ -2,7 +2,7 @@
 title: "Identification of Dynamic Discrete Choice Models with Present Bias"
 collection: research
 permalink: /research/id_beta_ddc
-date: 2022-10
+date: 2022-10-01
 ---
 
 <!--
