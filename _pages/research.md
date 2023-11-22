@@ -15,3 +15,8 @@ author_profile: true
 {% for post in site.research %}
 - [{{ post.title }}]({{ post.url | relative_url }})
 {% endfor %}
+
+<!--{% for post in site.research %}
+- [{{ post.title }}]({{ post.url | relative_url }})
+{% endfor %}
+-->
