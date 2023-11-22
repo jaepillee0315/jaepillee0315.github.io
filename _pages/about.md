@@ -1,6 +1,6 @@
 ---
 permalink: /
-title: "Hello There!"
+title: "Welcome to my website!"
 excerpt: "About me"
 author_profile: true
 redirect_from: 
@@ -8,4 +8,8 @@ redirect_from:
   - /about.html
 ---
 
-I am a Ph.D. Candidate in Economics at Tepper School of Business, Carnegie Mellon University. My focus is applied microeconomics with an emphasis on structural analysis. I mainly work on labor economics and dynamic discrete choice models.
+I am a Ph.D. Candidate in Economics at Tepper School of Business, Carnegie Mellon University.
+
+My research area is in the intersection of labor, public, and health economics. 
+
+I am also interested in developing methodology in dynamic discrete choice models.
