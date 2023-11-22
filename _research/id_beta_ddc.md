@@ -1,9 +1,8 @@
 ---
-title: "Identification of Discount Factor in Dynamic Discrete Choice Models"
+title: "Identification of Dynamic Discrete Choice Models with Present Bias"
 collection: research
 permalink: /research/id_beta_ddc
-excerpt: 'This paper is about the number 1. The number 2 is left for future work.'
-date: 2009-10-01
+date: 2022-10
 ---
 
 <!--
