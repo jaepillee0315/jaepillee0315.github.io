@@ -4,12 +4,14 @@ main:
   - title: "CV"
     url: /cv/
 
-  - title: "Code"
-    url: /code/
+  - title: "Research"
+    url: /research/
 
   - title: "Teaching"
     url: /teaching/    
-    
+
+  - title: "Code"
+    url: /code/
   # - title: "Portfolio"
   #   url: /portfolio/
         
