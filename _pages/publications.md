@@ -6,7 +6,7 @@ author_profile: true
 ---
 
 ``A Structural Analysis of Opioid Misuse: Labor, Health, Perception of Opioid Misuse Risk, and
-State-level Restrictions on Opioid Prescribing''
+State-level Restrictions on Opioid Prescribing'' (Job Market Paper)
 
 **Abstract:** This paper studies the economic drivers and behavioral aspect of opioid misuse. While the literature has been focusing on the supply-side drivers of the opioid crisis, little attention has been paid to the demand-side driver. This paper develops a dynamic discrete choice model of labor and opioid misuse with stochastic perception bias on opioid misuse risk. The estimation result shows that there exists some role of the perception bias on opioid misuse, but labor market displacement is the strongest driver of opioid misuse. The substitution effect of reducing access to prescription opioids increases opioid mortality rates, as using illegal opioids have become more lethal.
 
