@@ -6,7 +6,8 @@ author_profile: true
 ---
 
 "A Structural Analysis of Opioid Misuse: Labor, Health, Perception of Opioid Misuse Risk, and
-State-level Restrictions on Opioid Prescribing" (Job Market Paper, [Link]([https://example.com](https://www.dropbox.com/scl/fi/4by4huncfhc77klxaf4er/Jaepil_Lee_JMP.pdf?rlkey=q2fd0hfy2e24tqxstg51dgf7l&st=fpq2v5h9&dl=0))) 
+State-level Restrictions on Opioid Prescribing" (Job Market Paper, [Link](https://www.dropbox.com/scl/fi/4by4huncfhc77klxaf4er/Jaepil_Lee_JMP.pdf?rlkey=q2fd0hfy2e24tqxstg51dgf7l&st=fpq2v5h9&dl=0)) 
+
 **Abstract:** This paper examines the heterogeneous responses of opioid misuse across health and labor status during 2015-2019. Three aggregate changes that characterize this period are considered: increased risk of death from opioid misuse, the spread of state-level policies on opioid prescribing, and fluctuating prices. The role of opioid misuse risk perception is highlighted as an additional channel for policy intervention. By estimating a dynamic discrete choice model of opioid misuse with stochastic perception bias, I show that labor status is just as important as health conditions in determining opioid misuse. Counterfactual analysis indicates that the decrease in opioid misuse is mainly due to the increased risk of death from opioid misuse. Policies targeting opioid prescription generally have no effect on overall misuse but alter the share of people using illegal opioids. No evidence is found for the impact of illegally traded opioid prices on opioid misuse. Lastly, correcting the perception of opioid misuse risk would be effective in decreasing opioid misuse among the unemployed and those with poor mental health, but its aggregate effect is limited due to the relative rarity of perception bias.
 
 "Identification of Dynamic Discrete Choice Models with Quasi-Hyperbolic Discounting under
