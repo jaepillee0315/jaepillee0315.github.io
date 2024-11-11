@@ -17,7 +17,7 @@ Finite Dependence"
 
 "Sufficient Conditions for Identification of Dynamic Discrete Choice Models under Finite Dependence"
 
-**Abstract:** This paper investigates the role of finite dependence paths in the identification of dynamic discrete choice models. I prove constructively that there exists a maximum number of these paths, which exponentially grows by the number of states and choices. This growth helps explain the lack of consensus on the number of paths for reliable identification. In one-period finite dependence settings, identification of flow utilities is achieved by the full rank condition. Further, by examining a two-period finite dependence setting as a special case of multiple-period finite dependence, I demonstrate methods to determine identification for utility contrasts.
+**Abstract:** This paper investigates the role of finite dependence paths in identifying dynamic discrete choice models. I prove constructively that there exists a maximum number of these paths for identification in discrete state space. The number of finite dependence paths grows exponentially by the number of states and choices. This growth explains the lack of consensus on the number of paths for reliable identification. In the one-period finite dependence setting, identification of flow utilities is achieved by the full rank condition of the linear system of equations of conditional value function differences. By examining a two-period finite dependence setting as a special case of multiple-period finite dependence, I demonstrate methods to determine identification for utility primitives.
 
 "Externality in Sending Children Back Home: A Structural Approach to Foster Care Incentives"
 
