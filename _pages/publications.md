@@ -13,7 +13,12 @@ State-level Restrictions on Opioid Prescribing" (Job Market Paper, [Link](https:
 "Identification of Dynamic Discrete Choice Models with Quasi-Hyperbolic Discounting under
 Finite Dependence"
 
-**Abstract:** In this paper, I generalize the representation theorem in Arcidiacono and Miller (2019) in dynamic discrete choice models with quasi-hyperbolic discounting. Then I provide identification result given the two-period finite dependence and exclusion restriction in a finite horizon model. Monte Carlo simulation shows that the exclusion restriction is strong enough to separate the discount factor and present bias.
+<button onclick="toggleAbstract('abstract1')">Show/Hide Abstract</button>
+
+<div id="abstract1" style="display: none;">
+   In this paper, I generalize the representation theorem in Arcidiacono and Miller (2019) in dynamic discrete choice models with quasi-hyperbolic discounting. Then I provide identification result given the two-period finite dependence and exclusion restriction in a finite horizon model. Monte Carlo simulation shows that the exclusion restriction is strong enough to separate the discount factor and present bias.
+</div>
+
 
 "Sufficient Conditions for Identification of Dynamic Discrete Choice Models under Finite Dependence"
 
@@ -23,7 +28,19 @@ Finite Dependence"
 
 **Abstract:** This paper examines the unintended consequences of the foster care policy on children aimed at reunifying families. Although child abuse and neglect are rare, its recurrence and foster readmission are notably high. This raises concerns over the policy’s efficacy in children’s safety and health. Leveraging the Child and Caregiver Outcomes Using Linked Data (CCOULD) published by the U.S. Department of Health and Human Services, this study aims to (1) assess the impact of child maltreatment and foster care re/admission on children’s health; (2) evaluate whether Medicaid data can be used to predict future child maltreatment; (3) build a dynamic model of foster care system that flexibly captures its institutional incentive and incentive to care for children’s welfare, and (4) examine how would additional information from Medicaid change foster care system’s decision on children and how much it would change children’s welfare, measured by Medicaid expenditure.
 
+Work in Progress
 
-"De-biased Conditional Choice Probabilities Estimation off Short Panels" (with R. A. Miller)
+``De-biased Conditional Choice Probabilities Estimation off Short Panels" (with R. A. Miller)
 
 ``Lifecycle Decisions of Labor Supply, Homeownership, Marriage, and Fertility'' (with R. A. Miller)
+
+<script>
+  function toggleAbstract(id) {
+    var abstract = document.getElementById(id);
+    if (abstract.style.display === "none") {
+      abstract.style.display = "block";
+    } else {
+      abstract.style.display = "none";
+    }
+  }
+</script>
