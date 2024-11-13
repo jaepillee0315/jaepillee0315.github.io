@@ -13,7 +13,7 @@ author_profile: true
 
 <button onclick="toggleAbstract('child_abuse')" style="border: none; background: none; color: black; cursor: pointer; text-decoration: none;">Show/Hide Abstract</button>
 
-<div id="child_abuse" style="style="display: none;">
+<div id="child_abuse" style="display: none;">
     This paper examines the unintended consequences of the foster care policy on children aimed at reunifying families. Although child abuse and neglect are rare, its recurrence and foster readmission are notably high. This raises concerns over the policy’s efficacy in children’s safety and health. Leveraging the Child and Caregiver Outcomes Using Linked Data (CCOULD) published by the U.S. Department of Health and Human Services, this study aims to (1) assess the impact of child maltreatment and foster care re/admission on children’s health; (2) evaluate whether Medicaid data can be used to predict future child maltreatment; (3) build a dynamic model of foster care system that flexibly captures its institutional incentive and incentive to care for children’s welfare, and (4) examine how would additional information from Medicaid change foster care system’s decision on children and how much it would change children’s welfare, measured by Medicaid expenditure.
 </div>
 
