@@ -8,8 +8,6 @@ redirect_from:
   - /about.html
 ---
 
-I am a Ph.D. Candidate in Economics at Tepper School of Business, Carnegie Mellon University.
+I hold a Ph.D. in Economics from the Tepper School of Business, Carnegie Mellon University. I am joining the Korea Institute for International Economic Policy (KIEP) as a Research Associate.
 
-My research area is in the intersection of labor, public, and health economics. I am also interested in developing new methodologies in dynamic discrete choice models.
-
-I am on the job market in 2024-2025.
+My research area lies at the intersection of labor and health economics, with a focus on structural methods. I also develop new methodologies for dynamic discrete choice models.
