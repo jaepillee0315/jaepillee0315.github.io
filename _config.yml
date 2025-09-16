@@ -10,7 +10,7 @@ locale                   : "en-US"
 title                    : "Jaepil Lee"
 title_separator          : "-"
 name                     : &name "Jaepil Lee"
-description              : &description "Ph.D. Candidate in Economics at Carnegie Mellon University"
+description              : &description "Research Fellow at KIEP<br>Ph.D. in Economics at CMU"
 url                      : https://jaepillee0315.github.io # the base hostname & protocol for your site e.g. "https://mmistakes.github.io"
 baseurl                  : "" # the subpath of your site, e.g. "/blog"
 repository               : "https://github.com/jaepillee0315"
@@ -82,12 +82,12 @@ analytics:
 author:
   name             : ""
   avatar           : "Jaepil_Lee_2024_cropped.png"
-  bio              : 'Ph.D. Candidate in Economics at Carnegie Mellon University'
+  bio              : "Research Fellow at KIEP<br>Ph.D. in Economics at CMU"
   location         : 
   employer         :
   pubmed           : # "https://www.ncbi.nlm.nih.gov/pubmed/?term=john+snow"
   googlescholar    : # "http://yourfullgooglescholarurl.com"
-  email            :  'jaepil.lee@cmu.edu'
+  email            :  'jaepil.lee.0315@gmail.com'
   researchgate     :  # example: "https://www.researchgate.net/profile/yourprofile"
   uri              :
   bitbucket        :
@@ -96,7 +96,7 @@ author:
   flickr           :
   facebook         :
   foursquare       :
-  github           : "/jaepillee0315/"
+  github           : # "/jaepillee0315/"
   google_plus      :
   keybase          :
   instagram        :
@@ -230,7 +230,7 @@ defaults:
       read_time: true
       comments: true
       share: false
-      related: true
+      related: false
   # _posts
   - scope:
       path: ""
@@ -241,7 +241,7 @@ defaults:
       read_time: true
       comments: true
       share: false
-      related: true
+      related: false
   # _pages
   - scope:
       path: ""
@@ -255,7 +255,7 @@ defaults:
       type: teaching
     values:
       layout: single
-      author_profile: true
+      author_profile: false
       share: false
       comments: true
   # _publications
@@ -265,7 +265,7 @@ defaults:
     values:
       layout: single
       author_profile: false
-      share: true
+      share: false
       comments: true
   # _portfolio
   - scope:
@@ -274,7 +274,7 @@ defaults:
     values:
       layout: single
       author_profile: false
-      share: true
+      share: false
       comment: true
   # _talks
   - scope:
